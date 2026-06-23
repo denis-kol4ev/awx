@@ -1,0 +1,4 @@
+# vars file for keepalived
+---
+# primary_vip: 10.10.10.233
+# standby_vip: 10.10.10.234

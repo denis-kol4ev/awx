@@ -1,0 +1,71 @@
+-- Disable keepalived
+./clean_keepalive.sh
+
+#!/bin/bash
+sudo systemctl stop keepalived
+sudo systemctl disable keepalived
+sudo dnf -y remove keepalived
+sudo yum -y remove keepalived
+sudo rm -rf /etc/keepalived
+sudo rm -rf /home/oracle/maint/keepalived
+
+-- Disable flashback and FRA
+sqlplus / as sysdba @maint/disable_flashback_fra.sql
+
+alter database flashback off;
+alter system reset db_flashback_retention_target scope=both;
+alter system reset db_recovery_file_dest scope=both;
+alter system reset db_recovery_file_dest_size scope=spfile;
+startup force;
+exit;
+
+-- Disable FSFO
+dgmgrl -silent -echo / @maint/disable_fsfo.cmd
+
+edit database angel_orcl reset property LogXptMode;
+edit database devil_orcl reset property LogXptMode;
+edit database trinity_orcl reset property LogXptMode;
+edit database angel_orcl reset property NetTimeout;
+edit database devil_orcl reset property NetTimeout;
+edit database trinity_orcl reset property NetTimeout;
+edit configuration reset property FastStartFailoverThreshold;
+disable fast_start failover;
+edit configuration set protection mode as MaxPerformance;
+
+-- Disable Wallet
+dgmgrl /@angel_orcl <<< "stop observer"
+cp /opt/oracle/rdbms/19c/network/admin/tnsnames.ora.bkp /opt/oracle/rdbms/19c/network/admin/tnsnames.ora
+rm -rf /home/oracle/maint/fsfo
+
+mkstore -wrl /home/oracle/wallet/ -listCredential <<< Zz123456
+
+mkstore -wrl /home/oracle/wallet/ -deleteCredential angel_orcl <<< Zz123456
+mkstore -wrl /home/oracle/wallet/ -deleteCredential devil_orcl <<< Zz123456
+mkstore -wrl /home/oracle/wallet/ -deleteCredential trinity_orcl <<< Zz123456
+
+mkstore -wrl /home/oracle/wallet/ -deleteCredential orcl_angel19 <<< Zz123456
+mkstore -wrl /home/oracle/wallet/ -deleteCredential orcl_devil19 <<< Zz123456
+
+mkstore -wrl /home/oracle/wallet/ -nologo -createCredential orcl_angel19 sys Zz123456 <<EOF
+Zz123456
+EOF
+mkstore -wrl /home/oracle/wallet/ -nologo -createCredential orcl_devil19 sys Zz123456 <<EOF
+Zz123456
+EOF
+
+ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --extra-vars \
+"\
+host_list=angel19,devil19 \
+primary_vip=10.10.10.233 \
+standby_vip=10.10.10.234 \
+"
+
+ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --tags "broker,observer" --extra-vars "host_list=angel19,devil19"
+ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --tags "broker,observer" --extra-vars "host_list=pc-lab-ora01,pc-lab-ora02"
+
+ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --tags "keepalived" --extra-vars \
+"\
+host_list=pc-lab-ora01,pc-lab-ora02 \
+primary_vip=10.10.10.235 \
+standby_vip=10.10.10.236 \
+"

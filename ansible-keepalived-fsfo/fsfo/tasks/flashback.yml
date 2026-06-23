@@ -1,0 +1,56 @@
+---
+- name: Check Flashback configured. Step 1.
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    sqlplus -s "/ as sysdba" <<< "select flashback_on from v\$database;"
+  args:
+    executable: /bin/bash
+  register: sqlplus_cmd_result
+  become: yes
+  become_user: oracle
+  changed_when: false
+  failed_when: sqlplus_cmd_result.stdout_lines is search('ERROR|ORA-') or sqlplus_cmd_result.rc not in [0]
+  
+- name: Check Flashback configured. Step 2.
+  set_fact:
+    is_flashback_configured:  
+       "{{ True if sqlplus_cmd_result.stdout_lines | last | trim == 'YES' else
+           False if sqlplus_cmd_result.stdout_lines | last | trim == 'NO' }}"
+  
+- name: Block of tasks for configure Flashback 
+  block:
+     
+    - name: Create directory for Flashback script 
+      file:
+        path: "{{ script_dir }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+        mode: u=rwx,g=rx,o=rx
+      
+    - name: Copy Flashback script 
+      template:
+        src: flashback-on.j2
+        dest: "{{ script_dir }}/flashback-on.sql"
+        owner: oracle
+        group: oinstall
+        mode: u=rw,g=r,o=r
+      
+    - name: Execute Flashback script
+      shell: |
+        source ~/.bash_profile > /dev/null
+        sqlplus -S /nolog << EOF
+        conn sys / as sysdba
+        @flashback-on.sql
+        exit
+        EOF
+      args:
+        executable: /bin/bash
+        chdir: "{{ script_dir }}"
+      register: sqlplus_cmd_result
+
+    - name: Print Flashback execute result
+      debug:
+        msg: "{{ sqlplus_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
+            
+  when: not is_flashback_configured | bool

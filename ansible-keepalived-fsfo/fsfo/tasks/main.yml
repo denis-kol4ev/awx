@@ -1,0 +1,37 @@
+---
+- name: Get runtime DB vars
+  include_tasks: db-vars.yml
+  args:
+    apply:
+      tags: always
+  tags: always
+
+- name: Configure FRA
+  include_tasks: fra.yml
+  args:
+    apply:
+      tags: fra
+  tags: fra
+
+- name: Configure Flashback
+  include_tasks: flashback.yml
+  args:
+    apply:
+      tags: flashback
+  tags: flashback
+
+- name: Configure Broker
+  include_tasks: broker.yml
+  when: is_primary
+  args:
+    apply:
+      tags: broker
+  tags: broker
+
+- name: Configure Observer
+  include_tasks: observer.yml
+  when: is_primary
+  args:
+    apply:
+      tags: observer
+  tags: observer

@@ -1,0 +1,46 @@
+---
+- name: Check DB role
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    sqlplus -s "/ as sysdba" <<< "select 'DB_ROLE:' || upper(database_role) as c1 from v\$database;"  
+  args:
+    executable: /bin/bash
+  register: sqlplus_cmd_result
+  changed_when: false
+  failed_when: sqlplus_cmd_result.stdout_lines is search('ERROR|ORA-') or sqlplus_cmd_result.rc not in [0]
+
+- name: Print DB role
+  debug: 
+    msg: "{{ sqlplus_cmd_result.stdout_lines | select('search', '^DB_ROLE:.+$') }}"
+
+- name: Set vars based on DB role
+  set_fact:
+    is_primary: "{{ True if sqlplus_cmd_result.stdout_lines | regex_search('DB_ROLE:PRIMARY') else False }}"
+    is_standby: "{{ True if sqlplus_cmd_result.stdout_lines | regex_search('DB_ROLE:PHYSICAL STANDBY') else False }}"
+    
+- name: Check db_unique_name
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    sqlplus -s "/ as sysdba" <<< "select value from V\$PARAMETER where name='db_unique_name';"  
+  args:
+    executable: /bin/bash
+  register: sqlplus_cmd_result
+  changed_when: false
+  failed_when: sqlplus_cmd_result.stdout_lines is search('ERROR|ORA-') or sqlplus_cmd_result.rc not in [0]
+    
+- name: Set fact db_unique_name
+  set_fact:
+    db_unique_name: "{{ sqlplus_cmd_result.stdout_lines | last | trim }}"
+    cacheable: yes
+     
+- name: Build list of db_unique_name from all hosts
+  set_fact:
+    db_unique_name_list: "{{ ansible_play_hosts | map('extract', hostvars, 'db_unique_name') | map('lower') | list }}"
+  delegate_to: localhost
+  run_once: yes
+
+- name: Display result
+  debug:
+    var: db_unique_name_list
+  delegate_to: localhost
+  run_once: yes

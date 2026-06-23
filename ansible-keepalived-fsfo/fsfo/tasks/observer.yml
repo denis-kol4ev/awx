@@ -1,0 +1,113 @@
+---
+- name: Checking input parameters
+  assert:
+    that:
+      - dg_primary is defined and dg_primary | length > 0
+      - dg_standby is defined and dg_standby | length > 0
+      - tns_primary is defined and tns_primary | length > 0
+      - tns_standby is defined and tns_standby | length > 0
+    fail_msg: "One or more input parameter is empty. Check parameters."
+    success_msg: "All variables for observer is defined."
+
+- name: Add observer host to in-memory inventory
+  add_host:
+    name: "{{ observer_host }}"
+
+- name: Add primary and standby TNS entrys to observer tnsnames.ora 
+  blockinfile:
+    path: "{{ observer_ora_home }}/network/admin/tnsnames.ora"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK FOR {{ dg_primary }} / {{ dg_standby }} "
+    block: |
+      {{ tns_primary }}
+      {{ tns_standby }}
+  delegate_to: "{{ observer_host }}"
+  delegate_facts: true
+
+- name: Check primary and standby entrys in observer wallet 
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    mkstore -wrl /home/oracle/wallet/ -nologo -listCredential <<< {{ wallet_pass }}
+  args:
+    executable: /bin/bash
+  register: mkstore_cmd_check
+  delegate_to: "{{ observer_host }}"
+  delegate_facts: true
+  changed_when: false
+
+- name: Add primary and standby entrys to observer wallet 
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    mkstore -wrl /home/oracle/wallet/ -nologo -createCredential '{{ item }}' sys {{ sys_pass }} <<EOF
+    {{ wallet_pass }}
+    EOF
+  args:
+    executable: /bin/bash
+  loop:
+    - "{{ dg_primary }}"
+    - "{{ dg_standby }}"
+  register: mkstore_cmd_result
+  delegate_to: "{{ observer_host }}"
+  delegate_facts: true
+  when: mkstore_cmd_check.stdout is not search(item)
+
+- name: Print result
+  debug:
+    msg: "{{ item.stdout_lines | select('string') | reject('regex', '^$') | list }}"
+  loop: "{{ mkstore_cmd_result.results | selectattr('stdout_lines', 'defined') | list }}" 
+  loop_control: 
+    label: "{{ item.item }}"
+  delegate_to: "{{ observer_host }}"
+
+- name: Create directory for observer script 
+  file:
+    path: "{{ script_dir }}"
+    state: directory
+    owner: oracle
+    group: oinstall
+    mode: u=rwx,g=rx,o=rx
+  delegate_to: "{{ observer_host }}"
+
+- name: Copy observer script 
+  template:
+    src: observer.j2
+    dest: "{{ script_dir }}/{{ dg_primary }}_observer.cmd"
+    owner: oracle
+    group: oinstall
+    mode: u=rw,g=r,o=r
+  delegate_to: "{{ observer_host }}"
+
+- name: Start observer
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    dgmgrl -silent -echo /@{{ dg_primary }} @{{ dg_primary }}_observer.cmd
+  args:
+    executable: /bin/bash
+    chdir: "{{ script_dir }}"
+  register: dgmgrl_cmd_result
+  changed_when: false
+  failed_when: dgmgrl_cmd_result.stdout is search('FAILED|ERROR|ORA-\d{5}', ignorecase=True) or dgmgrl_cmd_result.rc not in [0]
+  delegate_to: "{{ observer_host }}"
+  delegate_facts: true
+
+- name: Wait until broker update configuration status ...
+  pause: 
+    seconds: 90
+
+- name: Check configuration 
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    dgmgrl -silent -echo /@{{ dg_primary }} <<EOF
+    show observer
+    show configuration
+    EOF
+  args:
+    executable: /bin/bash
+  register: dgmgrl_cmd_result
+  changed_when: false
+  failed_when: dgmgrl_cmd_result.stdout is search('ERROR|ORA-\d{5}|No observers', ignorecase=True) or dgmgrl_cmd_result.rc not in [0]
+  delegate_to: "{{ observer_host }}"
+
+- name: Print result
+  debug: 
+    msg: "{{ dgmgrl_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
+  delegate_to: "{{ observer_host }}"

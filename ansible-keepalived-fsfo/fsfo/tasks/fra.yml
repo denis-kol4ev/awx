@@ -1,0 +1,77 @@
+---
+- name: Check FRA configured. Step 1.
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    sqlplus -s "/ as sysdba" <<< "select nvl(length(value),0) c1 from V\$PARAMETER p where p.NAME='db_recovery_file_dest';"  
+  args:
+    executable: /bin/bash
+  register: sqlplus_cmd_result
+  changed_when: false
+  failed_when: sqlplus_cmd_result.stdout_lines is search('ERROR|ORA-') or sqlplus_cmd_result.rc not in [0]
+ 
+- name: Check FRA configured. Step 2.
+  set_fact:
+    is_fra_configured: "{{ True if sqlplus_cmd_result.stdout_lines | last | trim | int > 0 else False if sqlplus_cmd_result.stdout_lines | last | trim | int == 0 }}"
+
+- name: Block of tasks for configure FRA 
+  block:
+  
+    - name: Create FRA directory
+      file:
+        path: "{{ ora_fra }}/fast_recovery_area"
+        state: directory
+        owner: oracle
+        group: oinstall
+        mode: "u=rwx,g=rx,o=rx"
+      become: true
+      become_user: root
+  
+    - name: Set FRA vars
+      set_fact:
+        fra_location: "{{ ora_fra }}/fast_recovery_area"
+        fra_size_gb: "{{ (item.size_total / 1024 / 1024 / 1024) | round(0, 'floor') | int }}"
+      loop: "{{ ansible_facts['mounts'] }}"
+      loop_control: 
+        label: "{{ item.mount }}"
+      when: item.mount == ora_fra
+      
+    - name: Print FRA vars
+      debug:
+        msg: 
+         - "fra_location = {{ fra_location | default() }}"
+         - "fra_size_gb = {{ fra_size_gb | default()}}"    
+    
+    - name: Create directory for FRA script 
+      file:
+        path: "{{ script_dir }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+        mode: u=rwx,g=rx,o=rx
+      
+    - name: Copy FRA script 
+      template:
+        src: fra-on.j2
+        dest: "{{ script_dir }}/fra-on.sql"
+        owner: oracle
+        group: oinstall
+        mode: u=rw,g=r,o=r
+      
+    - name: Execute FRA script
+      shell: |
+        source ~/.bash_profile > /dev/null
+        sqlplus -S /nolog << EOF
+        conn sys / as sysdba
+        @fra-on.sql
+        exit
+        EOF
+      args:
+        executable: /bin/bash
+        chdir: "{{ script_dir }}"
+      register: sqlplus_cmd_result
+     
+    - name: Print FRA execute result
+      debug:
+        msg: "{{ sqlplus_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
+      
+  when: not is_fra_configured | bool

@@ -1,0 +1,63 @@
+! Configuration File for keepalived
+
+vrrp_script primary_check {
+      script "/home/oracle/maint/keepalived/primary_check.sh"
+      interval 5
+      timeout 10
+      rise 2
+      fall 2
+      user oracle
+}
+
+vrrp_script standby_check {
+      script "/home/oracle/maint/keepalived/standby_check.sh"
+      interval 5
+      timeout 10
+      rise 2
+      fall 2
+      user oracle
+}
+
+vrrp_instance VIP_PRIMARY {
+      state MASTER
+      interface {{ ansible_default_ipv4['interface'] }}
+      virtual_router_id 51
+      priority 100
+      advert_int 1
+      unicast_src_ip {{ ansible_default_ipv4['address'] }}
+      unicast_peer {
+        {{ hostvars['localhost']['standby_ip'] }}
+      }
+      authentication {
+         auth_type PASS
+         auth_pass 12345
+      }
+      virtual_ipaddress {
+        {{ primary_vip }}/{{ ansible_default_ipv4['prefix'] }}
+      }
+      track_script {
+         primary_check
+      }
+}
+
+vrrp_instance VIP_STANDBY {
+      state BACKUP
+      interface {{ ansible_default_ipv4['interface'] }}
+      virtual_router_id 52
+      priority 50
+      advert_int 1
+      unicast_src_ip {{ ansible_default_ipv4['address'] }}
+      unicast_peer {
+        {{ hostvars['localhost']['standby_ip'] }}
+      }
+      authentication {
+         auth_type PASS
+         auth_pass 12345
+      }
+      virtual_ipaddress {
+        {{ standby_vip }}/{{ ansible_default_ipv4['prefix'] }}
+      }
+      track_script {
+         standby_check
+      }
+}

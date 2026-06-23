@@ -1,0 +1,9 @@
+edit database {{ dg_primary }} set property LogXptMode='{{ broker_params['LogXptMode']}}';
+edit database {{ dg_standby }} set property LogXptMode='{{ broker_params['LogXptMode']}}';
+edit database {{ dg_primary }} set property NetTimeout={{ broker_params['NetTimeout']}};
+edit database {{ dg_standby }} set property NetTimeout={{ broker_params['NetTimeout']}};
+edit configuration set property FastStartFailoverThreshold={{ broker_params['FastStartFailoverThreshold']}};
+edit configuration set protection mode as {{ broker_params['DgProtectionMode']}};
+edit database {{ dg_primary }} set property FastStartFailoverTarget='{{ dg_standby }}';
+edit database {{ dg_standby }} set property FastStartFailoverTarget='{{ dg_primary }}';
+enable fast_start failover;

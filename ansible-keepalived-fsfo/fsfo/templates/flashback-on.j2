@@ -1,0 +1,53 @@
+whenever oserror exit failure
+whenever sqlerror exit sql.sqlcode
+set echo on
+set serveroutput on
+
+declare
+   v_sqlstr clob;
+   v_role   varchar2(100);
+   function isflashback return boolean as
+      v_flashback varchar2(100);
+   begin
+      select d.flashback_on
+        into v_flashback
+        from v$database d;
+      return v_flashback = 'YES';
+   end isflashback;
+
+begin
+   if not isflashback() then
+      select d.database_role
+        into v_role
+        from v$database d;
+
+      if v_role in ( 'PRIMARY',
+                     'PHYSICAL STANDBY' ) then
+         v_sqlstr := 'alter system set db_flashback_retention_target={{ flashback_retention_min }} scope=both';
+         execute immediate v_sqlstr;
+         dbms_output.put_line('db_flashback_retention_target set to {{ flashback_retention_min }}');
+      end if;
+
+      if v_role = 'PHYSICAL STANDBY' then
+         v_sqlstr := 'alter database recover managed standby database cancel';
+         execute immediate v_sqlstr;
+      end if;
+      if v_role in ( 'PRIMARY',
+                     'PHYSICAL STANDBY' ) then
+         v_sqlstr := 'alter database flashback on';
+         execute immediate v_sqlstr;
+         dbms_output.put_line('Flashback on');
+      end if;
+
+      if v_role = 'PHYSICAL STANDBY' then
+         v_sqlstr := 'alter database recover managed standby database disconnect nodelay';
+         execute immediate v_sqlstr;
+      end if;
+   else
+    dbms_output.put_line('Database already in flashback mode');
+   end if;
+exception
+   when others then
+      raise;
+end;
+/

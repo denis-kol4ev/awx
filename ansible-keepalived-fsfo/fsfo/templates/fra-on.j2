@@ -1,0 +1,32 @@
+whenever oserror exit failure
+whenever sqlerror exit sql.sqlcode
+set echo on
+set serveroutput on
+
+declare
+   v_sqlstr clob;
+   function is_fra_configured return boolean as
+      v_db_recovery_file_dest varchar2(100);
+   begin
+      select value
+        into v_db_recovery_file_dest
+        from v$parameter
+       where name = 'db_recovery_file_dest';
+      return v_db_recovery_file_dest is not null;
+   end is_fra_configured;
+
+begin
+   if not is_fra_configured() then
+      v_sqlstr := 'alter system set db_recovery_file_dest_size=''{{ fra_size_gb }}G'' scope=both';
+      execute immediate v_sqlstr;
+      v_sqlstr := 'alter system set db_recovery_file_dest=''{{ fra_location }}'' scope=both';
+      execute immediate v_sqlstr;
+      dbms_output.put_line('FRA is configured');
+   else
+      dbms_output.put_line('FRA already configured');
+   end if;
+exception
+   when others then
+      raise;
+end;
+/

@@ -1,0 +1,137 @@
+---
+- name: Disable SELinux permanently
+  selinux:
+    state: disabled
+  notify: reboot server
+
+- name: Flush handlers
+  meta: flush_handlers
+
+- name: Install keepalived for OS version 7
+  yum:
+    name: keepalived
+    state: present
+  when: ansible_distribution == 'OracleLinux' and ansible_distribution_major_version | int == 7
+
+- name: Install keepalived for OS version 9
+  dnf:
+    name: keepalived
+    state: present
+  when: ansible_distribution == 'OracleLinux' and ansible_distribution_major_version | int == 9
+    
+- name: Check DB role
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    sqlplus -s "/ as sysdba" <<< "select 'DB_ROLE:' || upper(database_role) as c1 from v\$database;"  
+  args:
+    executable: /bin/bash
+  register: ora_role
+  become: yes
+  become_user: oracle
+  changed_when: false
+  
+- name: Print DB role
+  debug: 
+    msg: "{{ ora_role.stdout_lines | select('search', '^DB_ROLE:.+$') }}"
+
+- name: Check DB role is correct
+  assert:
+    that: ora_role.stdout_lines is search 'PRIMARY|PHYSICAL STANDBY'
+    fail_msg: "DB role is not PRIMARY or PHYSICAL STANDBY."
+    success_msg: "DB role {{ ora_role.stdout_lines | regex_search('PRIMARY|PHYSICAL STANDBY') }} is valid role."
+  any_errors_fatal: true
+
+- name: Set vars based on DB role
+  set_fact:
+    is_primary: "{% if (ora_role.stdout_lines | regex_search('DB_ROLE:PRIMARY')) %}True{% else %}False{% endif %}"
+    is_standby: "{% if (ora_role.stdout_lines | regex_search('DB_ROLE:PHYSICAL STANDBY')) %}True{% else %}False{% endif %}"
+  
+- block:
+  - name: Add info about primary DB host IP to control node var. Step 1.
+    set_fact:
+      primary_ip: "{{ ansible_default_ipv4['address'] }}"
+
+  - name: Add info about primary DB host IP to control node var. Step 2.
+    set_fact:
+      primary_ip: "{{ primary_ip }}"
+    delegate_to: localhost
+    delegate_facts: true
+  when: is_primary | bool 
+
+- block:
+  - name: Add info about standby DB host IP to control node var. Step 1.
+    set_fact:
+      standby_ip: "{{ ansible_default_ipv4['address'] }}"
+  
+  - name: Add info about standby DB host IP to control node var. Step 2.
+    set_fact:
+      standby_ip: "{{ standby_ip }}"
+    delegate_to: localhost
+    delegate_facts: true
+  when: is_standby | bool 
+
+- name: Copy keepalived.conf for primary DB
+  template:
+    src: keepalived_primary.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+  when: is_primary | bool
+
+- name: Copy keepalived.conf for standby DB
+  template:
+    src: keepalived_standby.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+  when: is_standby | bool
+
+- name: Create directory for vrrp_script 
+  file:
+    path: /home/oracle/maint/keepalived
+    state: directory
+    owner: oracle
+    group: oinstall
+    mode: u=rwx,g=rx,o=rx
+
+- name: Copy vrrp_script 
+  copy:
+    src: "{{ item }}"
+    dest: "/home/oracle/maint/keepalived/{{ item }}" 
+    owner: oracle
+    group: oinstall
+    mode: u=rwx,g=r,o=r
+  loop:
+    - primary_check.sh
+    - standby_check.sh
+
+- name: Start keepalived
+  service:
+    name: keepalived
+    state: started
+    enabled: true
+
+- pause: seconds=15
+
+- name: Gther info about VIPs 
+  setup:
+    gather_subset:
+      - '!all'
+      - '!min'
+      - all_ipv4_addresses
+
+- name: Check VIP is active on primary DB server
+  assert:
+    that: primary_vip in ansible_all_ipv4_addresses
+    fail_msg: "VIP {{ primary_vip }} is not active on {{ ansible_hostname }}. Check keepalived log."
+    success_msg: "VIP {{ primary_vip }} is active on {{ ansible_hostname }}."
+  when: is_primary | bool
+
+- name: Check VIP is active on standby DB server
+  assert:
+    that: standby_vip in ansible_all_ipv4_addresses
+    fail_msg: "VIP {{ standby_vip }} is not active on {{ ansible_hostname }}. Check keepalived log."
+    success_msg: "VIP {{ standby_vip }} is active on {{ ansible_hostname }}."
+  when: is_standby | bool

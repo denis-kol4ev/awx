@@ -1,0 +1,137 @@
+---
+- name: Check broker configuration
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    dgmgrl -silent / "show configuration"
+  args:
+    executable: /bin/bash
+  register: dgmgrl_cmd_result
+  changed_when: false
+  failed_when: dgmgrl_cmd_result.stdout is search('^(?=.*(?:ERROR|ORA-\d{5}))(?!.*(ORA-16819)).+$', ignorecase=True, multiline=True) or dgmgrl_cmd_result.rc not in [0]
+  # Игнорируем Warning: ORA-16819: fast-start failover observer not started
+
+- name: Print result
+  debug: 
+    msg: "{{ dgmgrl_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
+
+- name: Print DG configuration members
+  debug: 
+    msg: "{{ dgmgrl_cmd_result.stdout_lines | select('search', 'Primary database|Physical standby database') | map('trim') | list }}"
+
+- name: Set DG members var
+  set_fact:
+    dg_members: "{{ dgmgrl_cmd_result.stdout_lines | select('search', 'Primary database|Physical standby database') | map('trim') | list }}"
+
+- name: Print DG members var
+  debug:
+    var: dg_members
+
+- name: Set DG primary var
+  set_fact:
+    dg_primary: "{{ item | regex_search('^\\S+') | lower }}"
+  loop: "{{ dg_members }}"
+  when: "'Primary database' in item and item | regex_search('^\\S+') in db_unique_name_list"
+
+- name: Set DG standby var
+  set_fact:
+    dg_standby: "{{ item | regex_search('^\\S+') | lower }}"
+  loop: "{{ dg_members }}"
+  when: "'Physical standby database' in item and item | regex_search('^\\S+') in db_unique_name_list" 
+
+- name: Print DG primary and standby vars
+  debug:
+    msg: 
+      - "dg_primary: {{ dg_primary }}" 
+      - "dg_standby: {{ dg_standby }}"
+
+- name: Check Primary StaticConnectIdentifier
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    dgmgrl -silent / "show database verbose {{ dg_primary }} StaticConnectIdentifier"
+  args:
+    executable: /bin/bash
+  register: dgmgrl_cmd_result
+  changed_when: false
+  failed_when: dgmgrl_cmd_result.stdout is search('ERROR|ORA-', ignorecase=True) or dgmgrl_cmd_result.rc not in [0]
+
+- name: Set Primary TNS var
+  set_fact:
+    tns_primary: "{{ dgmgrl_cmd_result.stdout_lines | select('search', 'StaticConnectIdentifier') | first | trim | replace('StaticConnectIdentifier', dg_primary ) | replace(\"'(\", \"(\") | replace(\")'\", \")\") }}"  
+
+- name: Check Standby StaticConnectIdentifier
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    dgmgrl -silent / "show database verbose {{ dg_standby }} StaticConnectIdentifier"
+  args:
+    executable: /bin/bash
+  register: dgmgrl_cmd_result
+  changed_when: false
+  failed_when: dgmgrl_cmd_result.stdout is search('ERROR|ORA-', ignorecase=True) or dgmgrl_cmd_result.rc not in [0]
+
+- name: Set Standby TNS var
+  set_fact:
+    tns_standby: "{{ dgmgrl_cmd_result.stdout_lines | select('search', 'StaticConnectIdentifier') | first | trim | replace('StaticConnectIdentifier', dg_standby ) | replace(\"'(\", \"(\") | replace(\")'\", \")\") }}"  
+
+- name: Print Primary TNS and Standby TNS vars
+  debug:
+    msg: 
+      - "{{ tns_primary }}"
+      - "{{ tns_standby }}"
+
+- name: Check Fast-Start Failover enabled. Step 1.
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    dgmgrl -silent / "show fast_start failover"
+  args:
+    executable: /bin/bash
+  register: dgmgrl_cmd_result
+  changed_when: false
+
+- name: Check Fast-Start Failover enabled. Step 2.
+  set_fact:
+    fsfo_line: "{{ dgmgrl_cmd_result.stdout_lines | select('regex', 'Fast-Start Failover:\\s+(Enabled|Disabled)') | first }}"
+
+- name: Check Fast-Start Failover enabled. Step 3.
+  set_fact:
+    is_fsfo_enabled: "{{ true if 'Enabled' in fsfo_line else false if 'Disabled' in fsfo_line else null }}"
+  when: fsfo_line is defined
+
+- name: Check Fast-Start Failover enabled. Result.
+  debug:
+    msg: 
+      - "is_fsfo_enabled: {{ is_fsfo_enabled }}"
+
+- name: Block of tasks for configure broker 
+  block:
+
+    - name: Create directory for broker script 
+      file:
+        path: "{{ script_dir }}"
+        state: directory
+        owner: oracle
+        group: oinstall
+        mode: u=rwx,g=rx,o=rx
+
+    - name: Copy broker script 
+      template:
+        src: broker.j2
+        dest: "{{ script_dir }}/broker.cmd"
+        owner: oracle
+        group: oinstall
+        mode: u=rw,g=r,o=r
+
+    - name: Execute broker script
+      shell: |
+        source ~/.bash_profile > /dev/null
+        dgmgrl -echo / @broker.cmd
+      args:
+        executable: /bin/bash
+        chdir: "{{ script_dir }}"
+      register: dgmgrl_cmd_result
+      failed_when: dgmgrl_cmd_result.stdout is search('Failed|ERROR|ORA-|cannot be accessed|not found', ignorecase=True) or dgmgrl_cmd_result.rc not in [0]
+
+    - name: Print broker execute result
+      debug:
+        msg: "{{ dgmgrl_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
+      
+  when: not is_fsfo_enabled | bool
