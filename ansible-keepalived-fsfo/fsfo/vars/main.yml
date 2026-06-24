@@ -10,6 +10,7 @@ broker_params:
     DgProtectionMode: 'MaxAvailability'
 observer_host: oem
 observer_ora_home: /opt/oracle/rdbms/19c
+observer_wallet_home: /opt/oracle/admin/wallet/db
 
 wallet_pass: !vault |
           $ANSIBLE_VAULT;1.1;AES256

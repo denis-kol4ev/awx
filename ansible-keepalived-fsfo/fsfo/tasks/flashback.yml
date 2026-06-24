@@ -52,5 +52,9 @@
     - name: Print Flashback execute result
       debug:
         msg: "{{ sqlplus_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
-            
+    
+    - name: Wait until broker update configuration status ...
+      pause: 
+        seconds: 30
+
   when: not is_flashback_configured | bool

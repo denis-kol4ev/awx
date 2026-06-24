@@ -1,1 +1,1 @@
-start observer {{ dg_primary }} in background file is {{ script_dir }}/{{ dg_primary }}_observer.dat logfile is {{ script_dir }}/{{ dg_primary }}_observer.log connect identifier is {{ dg_primary }};
+start observer {{ dg_primary | regex_replace('ora\d+$', 'observer') }} in background file is {{ script_dir }}/{{ dg_primary | regex_replace('ora\d+$', 'observer') }}.dat logfile is {{ script_dir }}/{{ dg_primary | regex_replace('ora\d+$', 'observer') }}.log connect identifier is {{ dg_primary }};

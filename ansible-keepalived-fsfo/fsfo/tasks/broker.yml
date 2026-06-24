@@ -89,18 +89,18 @@
 
 - name: Check Fast-Start Failover enabled. Step 2.
   set_fact:
-    fsfo_line: "{{ dgmgrl_cmd_result.stdout_lines | select('regex', 'Fast-Start Failover:\\s+(Enabled|Disabled)') | first }}"
+    fsfo_line: "{{ dgmgrl_cmd_result.stdout_lines | select('regex', '(?i)Fast-Start Failover:\\s+(Enabled|Disabled)') | first }}"
 
 - name: Check Fast-Start Failover enabled. Step 3.
   set_fact:
-    is_fsfo_enabled: "{{ true if 'Enabled' in fsfo_line else false if 'Disabled' in fsfo_line else null }}"
+    is_fsfo_enabled: "{{ true if 'enabled' in (fsfo_line | lower) else false if 'disabled' in (fsfo_line | lower) else none }}"
   when: fsfo_line is defined
 
 - name: Check Fast-Start Failover enabled. Result.
   debug:
     msg: 
       - "is_fsfo_enabled: {{ is_fsfo_enabled }}"
-
+ 
 - name: Block of tasks for configure broker 
   block:
 
@@ -134,4 +134,4 @@
       debug:
         msg: "{{ dgmgrl_cmd_result.stdout_lines | select('string') | reject('regex', '^$') | list }}"
       
-  when: not is_fsfo_enabled | bool
+  when: is_fsfo_enabled is defined and is_fsfo_enabled == false

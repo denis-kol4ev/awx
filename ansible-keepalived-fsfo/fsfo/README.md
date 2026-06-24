@@ -1,71 +1,38 @@
+Role Name
+=========
 
-```table-of-contents
-```
+A brief description of the role goes here.
 
-#### Описание
+Requirements
+------------
 
-Плейбук для настройки сервисов Keepalived и FSFO в среде Oracle Data Guard.
-Cостоит из двух ролей `keepalived` и `fsfo`, которые выполняют следующий объём работ:
-##### keepalived
-- отключение SELinux
-- установка keepalived
-- конфигурирование keepalived
-- поднятие VIP адресов в зависимости от роли БД
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
 
-##### fsfo
-- настройка FRA
-- настройка Flashback
-- обновление конфигурации Broker
-- настройка и запуск Observer
-#### Требования
+Role Variables
+--------------
 
-- два VIP адреса для primary и standby БД 
-- настроенная конфигурация Data Guard с одним или более standby серверами управляемая через Data Guard Broker
-- отдельный сервер с ролью observer с настроенным wallet для хранения подключений к управляемым БД
-#### Переменные
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
 
-[keepalived/vars/main.yml](keepalived/vars/main.yml)
-`primary_vip` - vip адрес primary БД
-`standby_vip` - vip адрес standby БД
+Dependencies
+------------
 
-[fsfo/vars/main.yml](fsfo/vars/main.yml)
-`ora_fra` - директория для FRA
-`flashback_retention_min` - длительность удержания flashback
-`script_dir - директория` для временных скрпитов настройки FRA и flashback
-`broker_params` - параметры брокера необходимые для работы FSFO
-`observer_host` - имя хоста observer
-`observer_ora_home` - oracle home на хосте observer
-`wallet_pass` - пароль от wallet на хосте observer
-`sys_pass` - пароль sys для подключения к БД
-#### Примеры запуска
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
 
-> [!NOTE]  
-> Плейбук запускать под пользователем с правами `sudo`
+Example Playbook
+----------------
 
-Стандартный запуск для выполнения всего объёма работы
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
 
-```shell
-ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --extra-vars \
-"\
-host_list=angel19,devil19 \
-primary_vip=10.10.10.233 \
-standby_vip=10.10.10.234 \
-"
-```
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
 
-Запуск определенных заданий по `tags`, выполняется настройка только необходимой части
-- keepalived 
-- fra
-- flashback
-- broker
-- observer
+License
+-------
 
-```shell
-ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --tags "keepalived" --extra-vars \
-"\
-host_list=angel19,devil19 \
-primary_vip=10.10.10.233 \
-standby_vip=10.10.10.234 \
-"
-ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --tags "broker,observer" --extra-vars "host_list=angel19,devil19"
-```
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).

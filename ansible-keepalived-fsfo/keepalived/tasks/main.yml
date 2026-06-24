@@ -6,7 +6,7 @@
 
 - name: Flush handlers
   meta: flush_handlers
-
+    
 - name: Install keepalived for OS version 7
   yum:
     name: keepalived
