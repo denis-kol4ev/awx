@@ -1,0 +1,21 @@
+---
+- name: OS. Include tasks. Prepare tasks
+  include_tasks: "prepare-tasks.yml"
+  args:
+    apply:
+      tags: prepare
+  tags: prepare
+
+- name: OS. Include tasks. DB role tasks
+  include_tasks: "db-role-tasks.yml"
+  args:
+    apply:
+      tags: db
+  tags: db
+
+- name: OS. Include tasks. Up alias
+  include_tasks: "{{ ansible_facts['distribution'] }}-{{ ansible_facts['distribution_major_version'] }}-tasks.yml"
+  args:
+    apply:
+      tags: up
+  tags: up

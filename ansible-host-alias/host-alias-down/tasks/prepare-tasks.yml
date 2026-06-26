@@ -1,0 +1,28 @@
+---
+- name: ENV. Collect interface data
+  set_fact:
+    net_interface_data: "{{ net_interface_data | default([]) + [ ansible_facts[item] ] }}"
+  loop: "{{ ansible_facts.interfaces }}"
+
+- name: ENV. Set list of IPv4 addresses (primary and secondary)
+  set_fact:
+    net_ip4_list: "{{ net_ip4_list | default([]) + [ item.address | string ~ '/' ~ item.prefix | string ] }}"
+  loop: "{{ net_interface_data | selectattr('ipv4', 'defined') | map(attribute='ipv4') | flatten + 
+            net_interface_data | selectattr('ipv4_secondaries', 'defined') | map(attribute='ipv4_secondaries') | flatten }}"
+  when: 
+    - item.address is defined
+    - item.prefix is defined
+    - item.address not in '127.0.0.1'
+  loop_control:
+    label: "{{ item.address }}"
+
+- name: ENV. Set list of unique IPv4 addresses
+  set_fact:
+    net_ip4_list: "{{ net_ip4_list | unique | list }}"
+
+- name: Output. Informations.
+  debug:
+    msg:
+      - "Hostname: {{ ansible_hostname }}"
+      - "IPv4 current list:"
+      - "{{ net_ip4_list }}"

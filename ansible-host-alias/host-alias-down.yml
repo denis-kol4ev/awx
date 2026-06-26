@@ -1,0 +1,14 @@
+---
+- name: Host alias
+  hosts: "{{ all_host_list | select() | flatten | unique }}"
+  vars:
+    all_host_list:
+      - "{{ host_list | default() | lower }}"
+      - "{{ primary_host_list | default() | lower }}"
+      - "{{ standby_host_list | default() | lower }}"
+  gather_facts: true
+  roles:
+    
+     - role: host-alias-down
+       become: true
+       become_user: root

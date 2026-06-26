@@ -1,0 +1,27 @@
+---
+- name: Check DB role
+  shell: |  
+    source /home/oracle/.bash_profile > /dev/null
+    sqlplus -s "/ as sysdba" <<< "select 'DB_ROLE:' || upper(database_role) as c1 from v\$database;"  
+  args:
+    executable: /bin/bash
+  register: ora_role
+  become: true
+  become_user: oracle
+  changed_when: false
+  
+- name: Print DB role
+  debug: 
+    msg: "{{ ora_role.stdout_lines | select('search', '^DB_ROLE:.+$') }}"
+
+- name: Check DB role is correct
+  assert:
+    that: ora_role.stdout_lines is search 'PRIMARY|PHYSICAL STANDBY'
+    fail_msg: "DB role is not PRIMARY or PHYSICAL STANDBY."
+    success_msg: "DB role {{ ora_role.stdout_lines | regex_search('PRIMARY|PHYSICAL STANDBY') }} is valid role."
+  any_errors_fatal: true
+
+- name: Set vars based on DB role
+  set_fact:
+    is_primary: "{% if (ora_role.stdout_lines | regex_search('DB_ROLE:PRIMARY')) %}True{% else %}False{% endif %}"
+    is_standby: "{% if (ora_role.stdout_lines | regex_search('DB_ROLE:PHYSICAL STANDBY')) %}True{% else %}False{% endif %}"
