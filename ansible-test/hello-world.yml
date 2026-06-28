@@ -1,0 +1,6 @@
+- name: Hello World Sample
+  hosts: "{{ host_list | default() | lower }}"
+  tasks:
+    - name: Hello Message
+      debug:
+        msg: "Hello World from {{ ansible_hostname }}!"
