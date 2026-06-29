@@ -1,0 +1,46 @@
+---
+- name: Checking input parameters
+  assert:
+    that:
+      - net_ip4_list is defined
+    fail_msg: "One or more input parameter is empty. Check parameters."
+    success_msg: "All variable is defined."
+
+- name: ENV. Set ip for alias
+  set_fact:
+    alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+
+- name: Output. Informations.
+  debug:
+    msg:
+      - "VIP: {{ alias_ip }}"
+
+# Остановка primary_vip или standby_vip если адрес настроен на хосте
+- block:
+
+  - name: OS. Shutdown virtual ip for alias
+    nmcli:
+      conn_name: "{{ ansible_facts['default_ipv4']['interface'] }}"
+      ifname: "{{ ansible_facts['default_ipv4']['interface'] }}"
+      type: ethernet
+      method4: manual
+      ip4: "{{ net_ip4_list | reject('search', alias_ip) | list }}"
+      state: present
+    register: nmcli_result_raw
+
+  - name: OS. Reload network interface
+    shell: "nmcli connection up {{ ansible_facts['default_ipv4']['interface'] }}"
+    args:
+      executable: /bin/bash
+    when: nmcli_result_raw.changed
+    async: 15
+    poll: 0
+
+  - name: Output. Informations.
+    debug:
+      msg:
+        - "VIP {{ alias_ip }} DOWN"
+        
+  when: alias_ip != '' and
+        (primary_vip in ansible_facts['all_ipv4_addresses'] or
+        standby_vip in ansible_facts['all_ipv4_addresses'])

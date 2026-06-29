@@ -1,0 +1,14 @@
+---
+- name: OS. Include tasks. Prepare tasks
+  include_tasks: "prepare-tasks.yml"
+  args:
+    apply:
+      tags: prepare
+  tags: prepare
+
+- name: OS. Include tasks. Down alias
+  include_tasks: "{{ ansible_facts['distribution'] }}-{{ ansible_facts['distribution_major_version'] }}-tasks.yml"
+  args:
+    apply:
+      tags: down
+  tags: down

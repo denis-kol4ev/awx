@@ -6,14 +6,14 @@
       - "{{ host_list | default() | lower }}"
       - "{{ primary_host_list | default() | lower }}"
       - "{{ standby_host_list | default() | lower }}"
-      #- pc-lab-ora01
-      #- pc-lab-ora02
-      #- pc-lab-ora03
-      #- angel19
-      #- devil19
   gather_facts: true
   roles:
     
+     - role: host-alias-down
+       become: true
+       become_user: root
+       tags: alias
+
      - role: keepalived
        become: true
        become_user: root

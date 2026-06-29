@@ -3,4 +3,4 @@
   tasks:
     - name: Hello Message
       debug:
-        msg: "Hello World from {{ ansible_hostname }}!"
+        msg: "Hello World from {{ ansible_hostname }} !"
