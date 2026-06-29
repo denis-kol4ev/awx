@@ -53,6 +53,12 @@ mkstore -wrl /home/oracle/wallet/ -nologo -createCredential orcl_devil19 sys Zz1
 Zz123456
 EOF
 
+-- Restore alias from backup
+cd /etc/NetworkManager/system-connections
+sudo cp ens160.nmconnection.back ens160.nmconnection
+sudo nmcli connection reload
+sudo nmcli connection up ens160
+
 ansible-playbook keepalived-fsfo.yml --user den --ask-pass --ask-vault-pass --extra-vars \
 "\
 host_list=angel19,devil19 \

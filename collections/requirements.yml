@@ -2,4 +2,5 @@
 collections:
   - community.general
   - ansible.posix
-  - ansible.utils
+  - name: ansible.utils
+    version: ">=4.0.0,<5.0.0"
