@@ -1,4 +1,17 @@
 ---
+- name: Debug AWX Engine Environment
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Get internal Ansible version
+      ansible.builtin.command: ansible --version
+      register: awx_ansible_version
+
+    - name: Print the version details
+      ansible.builtin.debug:
+        var: awx_ansible_version.stdout_lines
+
 - name: Force Install Dependencies inside AWX Runner Container
   hosts: localhost
   gather_facts: false
