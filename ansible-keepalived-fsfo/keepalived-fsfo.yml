@@ -1,4 +1,16 @@
 ---
+- name: Force Install Dependencies inside AWX Runner Container
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Inject netaddr library into the active Ansible Python virtualenv
+      ansible.builtin.pip:
+        name: netaddr
+        state: present
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
 - name: Keepalived + FSFO
   hosts: "{{ all_host_list | select() | flatten | unique }}"
   vars:
