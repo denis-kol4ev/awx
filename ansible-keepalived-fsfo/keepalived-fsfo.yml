@@ -4,12 +4,11 @@
   gather_facts: false
   connection: local
   tasks:
-    - name: Inject netaddr library into the active Ansible Python virtualenv
+    - name: Inject netaddr library globally into the container
       ansible.builtin.pip:
         name: netaddr
         state: present
-      vars:
-        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+        extra_args: --user
 
 - name: Keepalived + FSFO
   hosts: "{{ all_host_list | select() | flatten | unique }}"
