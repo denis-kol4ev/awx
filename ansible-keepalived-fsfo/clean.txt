@@ -54,6 +54,9 @@ Zz123456
 EOF
 
 -- Restore alias from backup
+./restore_alias.sh
+
+#!/bin/bash
 cd /etc/NetworkManager/system-connections
 sudo cp ens160.nmconnection.back ens160.nmconnection
 sudo nmcli connection reload

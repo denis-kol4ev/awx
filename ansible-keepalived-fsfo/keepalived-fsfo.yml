@@ -3,6 +3,7 @@
   hosts: localhost
   gather_facts: false
   connection: local
+  tags: always
   tasks:
     - name: Get internal Ansible version
       ansible.builtin.command: ansible --version
