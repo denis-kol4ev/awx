@@ -17,6 +17,7 @@
   hosts: localhost
   gather_facts: false
   connection: local
+  tags: always
   tasks:
     - name: Inject netaddr library globally into the container
       ansible.builtin.pip:
