@@ -6,9 +6,24 @@
     fail_msg: "One or more input parameter is empty. Check parameters."
     success_msg: "All variable is defined."
 
+#- name: ENV. Set ip for alias
+#  set_fact:
+#    alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+
+# Step 1: Force AWX to evaluate the filter locally using its own active venv
+- name: ENV. Calculate ip for alias locally inside the valid AWX venv
+  delegate_to: localhost
+  connection: local
+  vars:
+    # This maps the task directly to the parent Python context where everything works
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  ansible.builtin.set_fact:
+    temp_calculated_alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+
+# Step 2: Pass the pre-compiled raw string to your target hosts
 - name: ENV. Set ip for alias
-  set_fact:
-    alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+  ansible.builtin.set_fact:
+    alias_ip: "{{ temp_calculated_alias_ip }}"
 
 - name: Output. Informations.
   debug:
