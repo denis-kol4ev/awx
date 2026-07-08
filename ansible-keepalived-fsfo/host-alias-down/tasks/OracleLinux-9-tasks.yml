@@ -17,6 +17,9 @@
   vars:
     # This maps the task directly to the parent Python context where everything works
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  environment:
+    # This environment variable forces the Python engine to read the user-installed pip libraries
+    PYTHONPATH: "{{ ansible_env.HOME | default('/home/runner') }}/.local/lib/python3.9/site-packages"
   ansible.builtin.set_fact:
     temp_calculated_alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
 
