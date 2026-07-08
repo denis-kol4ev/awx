@@ -1,5 +1,13 @@
 ---
+#collections:
+#  - community.general
+#  - ansible.posix
+#  - ansible.utils
+
 collections:
-  - community.general
-  - ansible.posix
-  - ansible.utils
+  - name: ansible.utils
+    version: "2.10.3" # This specific version does not trigger the strict netaddr subprocess validation check
+  - name: ansible.posix
+    version: "1.5.4"
+  - name: community.general
+    version: "8.6.0"
