@@ -6,9 +6,20 @@
     fail_msg: "One or more input parameter is empty. Check parameters."
     success_msg: "All variable is defined."
 
-- name: ENV. Set ip for alias
-  set_fact:
-    alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+#- name: ENV. Set ip for alias
+#  set_fact:
+#    alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+
+- name: ENV. Set ip for alias using native clean text matching
+  ansible.builtin.set_fact:
+    alias_ip: >-
+      {% set clean_ips = net_ip4_list | map('regex_replace', '/\d+$', '') | list %}
+      {% if primary_vip in clean_ips %}
+      {{ primary_vip }}
+      {% elif standby_vip in clean_ips %}
+      {{ standby_vip }}
+      {% else %}
+      {% endif %}
 
 - name: Output. Informations.
   debug:
