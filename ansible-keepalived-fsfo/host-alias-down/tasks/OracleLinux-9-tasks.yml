@@ -6,26 +6,19 @@
     fail_msg: "One or more input parameter is empty. Check parameters."
     success_msg: "All variable is defined."
 
+# Для окружения AWX старше awx-ee:24.6.1
 #- name: ENV. Set ip for alias
+#  vars:
+#    clean_ips: "{{ net_ip4_list | map('ansible.utils.ipaddr', 'address') | list }}"
 #  set_fact:
-#    alias_ip: "{{ primary_vip if primary_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else standby_vip if standby_vip in (net_ip4_list | map('ansible.utils.ipaddr', 'address') | list) else '' }}"
+#    alias_ip: "{{ primary_vip if primary_vip in clean_ips else standby_vip if standby_vip in clean_ips else '' }}"
 
+# Для окружения AWX awx-ee:24.6.1
 - name: ENV. Set ip for alias
   vars:
-    clean_ips: "{{ net_ip4_list | map('ansible.netcommon.ipaddr', 'address') | list }}"
+    clean_ips: "{{ net_ip4_list | map('regex_replace', '/\\d+$', '') | list }}"
   set_fact:
     alias_ip: "{{ primary_vip if primary_vip in clean_ips else standby_vip if standby_vip in clean_ips else '' }}"
-
-#- name: ENV. Set ip for alias using native clean text matching
-#  ansible.builtin.set_fact:
-#    alias_ip: >-
-#      {% set clean_ips = net_ip4_list | map('regex_replace', '/\d+$', '') | list %}
-#      {% if primary_vip in clean_ips %}
-#      {{ primary_vip }}
-#      {% elif standby_vip in clean_ips %}
-#      {{ standby_vip }}
-#      {% else %}
-#      {% endif %}
 
 - name: Output. Informations.
   debug:

@@ -3,4 +3,3 @@ collections:
   - community.general
   - ansible.posix
   - ansible.utils
-  - ansible.netcommon
