@@ -7,18 +7,18 @@
     success_msg: "All variable is defined."
 
 # Для окружения AWX старше awx-ee:24.6.1
-#- name: ENV. Set ip for alias
-#  vars:
-#    clean_ips: "{{ net_ip4_list | map('ansible.utils.ipaddr', 'address') | list }}"
-#  set_fact:
-#    alias_ip: "{{ primary_vip if primary_vip in clean_ips else standby_vip if standby_vip in clean_ips else '' }}"
-
-# Для окружения AWX awx-ee:24.6.1
 - name: ENV. Set ip for alias
   vars:
-    clean_ips: "{{ net_ip4_list | map('regex_replace', '/\\d+$', '') | list }}"
+    clean_ips: "{{ net_ip4_list | map('ansible.utils.ipaddr', 'address') | list }}"
   set_fact:
     alias_ip: "{{ primary_vip if primary_vip in clean_ips else standby_vip if standby_vip in clean_ips else '' }}"
+
+# Универсальный вариант для любых окружений AWX
+#- name: ENV. Set ip for alias
+#  vars:
+#    clean_ips: "{{ net_ip4_list | map('regex_replace', '/\\d+$', '') | list }}"
+#  set_fact:
+#    alias_ip: "{{ primary_vip if primary_vip in clean_ips else standby_vip if standby_vip in clean_ips else '' }}"
 
 - name: Output. Informations.
   debug:
