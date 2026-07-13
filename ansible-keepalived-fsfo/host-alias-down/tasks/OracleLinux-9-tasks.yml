@@ -12,7 +12,7 @@
 
 - name: ENV. Set ip for alias
   vars:
-    clean_ips: "{{ net_ip4_list | map('ipaddr', 'address') | list }}"
+    clean_ips: "{{ net_ip4_list | map('ansible.netcommon.ipaddr', 'address') | list }}"
   set_fact:
     alias_ip: "{{ primary_vip if primary_vip in clean_ips else standby_vip if standby_vip in clean_ips else '' }}"
 
